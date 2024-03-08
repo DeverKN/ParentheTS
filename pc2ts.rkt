@@ -540,7 +540,7 @@
                                             "    return str.replace(/(~[sav])/g, function (match: Object) {\n"
                                             "        var argi = args[i];\n"
                                             "        i = i + 1;\n"
-                                            "        return argi;\n"
+                                            "        return JSON.stringify(argi);\n"
                                             "    });\n"
                                             "}\n"
                                             "var _dismount_thunk: Function = function () {\n"
