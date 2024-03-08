@@ -184,7 +184,7 @@
                                      [else (pc2ts-append name "_" safe-tag)])])
                       (pc2ts-append
                        (pc2ts-fn-proto fnname field*) " {\n"
-                       "    return new UnionType(UnionEnums." name "." safe-tag ", {"
+                       "    return UnionType(UnionEnums." name "." safe-tag ", {"
                        (string-join (map (λ (v)
                                            (string-append
                                             "\n        \""
@@ -385,7 +385,7 @@
                (if (is-global? var)
                    (begin
                      (set! current-global-decls (remove-duplicates (cons (global var) current-global-decls)))
-                     (pc2ts-append (tabs level) "globalThis." (global var) " = " (string-trim val) ";\n"))
+                     (pc2ts-append (tabs level) (global var) " = " (string-trim val) ";\n"))
                    (pc2ts-append (tabs level) (safe var) " = " (string-trim val) "\n")))]
             [`(union-case ,val ,name . ,c*)
              (let ((template* (map car c*))
@@ -405,7 +405,7 @@
                                                body*))])
                      (pc2ts-append
                       ; "    global " val "\n"
-                      "    switch ((globalThis." target_u_obj " as UnionType).type) {\n"
+                      "    switch ((" target_u_obj " as UnionType).type) {\n"
                       cases
                       "    }\n"))))]
             [`(let ,bind* ,body) 
@@ -544,7 +544,7 @@
                                             "    });\n"
                                             "}\n"
                                             "var _dismount_thunk: Function = function () {\n"
-                                            "    globalThis.g__pc_ = undefined;\n"
+                                            "    g__pc_ = undefined;\n"
                                             "};\n"
                                             )
                                        ((parse-function-body #t env 0) body)))
@@ -570,9 +570,9 @@
            [s2 (apply string-append (map (pc2ts-gen-funcs (global-env)) reg-funcs))])
       (let ([s3 (pc2ts-append
                  "function mount_tram() {\n"
-                 "    globalThis." dismount-var "= " construct-var "(_dismount_thunk)\n\n"
-                 "    while (globalThis.g__pc_ !== undefined) {\n"
-                 "        globalThis." reg-pc "();\n"
+                 "    " dismount-var "= " construct-var "(_dismount_thunk)\n\n"
+                 "    while (g__pc_ !== undefined) {\n"
+                 "        " reg-pc "();\n"
                  "    }\n"
                  "}\n\n")])
         (string-append
@@ -590,15 +590,9 @@
      (apply string-append
             (map pc2ts-header-parse decl*))
      "// Define the union classes\n"
-     "class UnionType extends Object {\n"
-     "    type: String = undefined;\n"
-     "    constructor(type: String, parameters: Object) {\n"
-     "        super();\n"
-     "        this.type = type;\n"
-     "        for (var key in parameters) {\n"
-     "            this[key] = parameters[key];\n"
-     "        }\n"
-     "    }\n"
+     "type UnionType = { type: string } & Record<string, any>\n"
+     "const UnionType = (tag: string, vals: Record<string, any>): UnionType => {\n"
+     "    return { ...vals, type: tag }\n"
      "}\n"
      "namespace UnionEnums {\n"
      union-defs
@@ -618,18 +612,16 @@
         (if (null? reg*)
             ""
             (string-append
-             "declare global {\n"
              (join (map (λ (v)
                           (let ([global-new (global v)])
                             (set! global-decls (cons global-new global-decls))
-                            (string-append "    var " global-new ";"))) reg*) "\n")
-             "\n}\n"
-             "export {}\n")))]
+                            (string-append "var " global-new ": any;"))) reg*) "\n")
+             "\nexport {}\n")))]
       [`(define-program-counter ,pc)
        (set! reg-pc (global pc))
        (string-append
         "// Define the program counter\n"
-        "var " reg-pc " : Function = undefined;\n\n")]
+        "var " reg-pc " : Function | undefined = undefined;\n\n")]
       [`(define-union ,name . ,c*) 
        (let ((tag* (map car c*))
              (field** (map cdr c*)))
@@ -663,7 +655,7 @@
     (let ([declare-params
            (lambda (param*)
              (join (map (lambda (param)
-                          (format "~a" (safe param))) param*) ", "))])
+                          (format "~a : any" (safe param))) param*) ", "))])
       (pc2ts-append
        "function " (safe fn-name) "(" (declare-params param*)  ")"))))
 
