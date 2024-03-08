@@ -574,13 +574,18 @@
                  "    while (g__pc_ !== undefined) {\n"
                  "        " reg-pc "();\n"
                  "    }\n"
-                 "}\n\n")])
+                 "}\n\n")]
+            [s4 (pc2ts-append
+                 "function jumpout() {\n"
+                 "    g__pc_ = undefined\n"
+                 "}")])
         (string-append
          "// Union functions\n"
          s1
          "// Generate functions\n"
          s2
          s3
+         s4
          "\n"
          main-def)))))
 
@@ -661,7 +666,7 @@
 
 (define compile/run
   (lambda (base-name)
-    (let ([pc-file (string-append base-name ".ppy")]
-          [py-file (string-append base-name ".py")])
-      (pc2ts pc-file py-file)
-      (system (string-append "python ./" py-file)))))
+    (let ([pc-file (string-append base-name ".pc")]
+          [ts-file (string-append base-name ".ts")])
+      (pc2ts pc-file ts-file)
+      (system (string-append "ts-node ./" ts-file)))))
