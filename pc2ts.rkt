@@ -544,7 +544,7 @@
                                             "    });\n"
                                             "}\n"
                                             "var _dismount_thunk: Function = function () {\n"
-                                            "    g__pc_ = undefined;\n"
+                                            "    " reg-pc " = undefined;\n"
                                             "};\n"
                                             )
                                        ((parse-function-body #t env 0) body)))
@@ -571,13 +571,13 @@
       (let ([s3 (pc2ts-append
                  "function mount_tram() {\n"
                  "    " dismount-var "= " construct-var "(_dismount_thunk)\n\n"
-                 "    while (g__pc_ !== undefined) {\n"
+                 "    while (" reg-pc " !== undefined) {\n"
                  "        " reg-pc "();\n"
                  "    }\n"
                  "}\n\n")]
             [s4 (pc2ts-append
                  "function jumpout() {\n"
-                 "    g__pc_ = undefined\n"
+                 "   " reg-pc " = undefined\n"
                  "}")])
         (string-append
          "// Union functions\n"
