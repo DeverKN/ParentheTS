@@ -276,7 +276,7 @@
                                               "            var " (safe (car var*)) " = " u_obj
                                               "." (safe (lookup-arg name tag n)) ";\n")
                                              (loop (cdr var*) (add1 n)))]))
-                                  ((parse-function-body #t (case-env env var*) 3) body)
+                                  ((parse-case-body #t (case-env env var*) 3 var*) body)
                                   "            break;\n\n"))))]
         ;; Cannot possibly be effective, commented JBH 12/13
         ;; [else (string-append "default {\n"
@@ -303,6 +303,13 @@
       [`((else ,body)) '()]
       [`((,test ,body) . ,c*) `((,test ,body) . ,(remove-last c*))])))
 
+(define env-contains
+  (lambda (env x)
+    (match env
+      [`(empty-env) #f]
+      [`(extend-env ,x^ ,a ,env)
+       (if (eq? x^ x) #t (apply-env env x))])))
+
 (define apply-env
   (lambda (env x)
     (match env
@@ -323,6 +330,21 @@
     (cond
       [(zero? n) ""]
       [else (string-append "    " (tabs (sub1 n)))])))
+
+(define parse-case-body
+  (λ (tail env level union-vals)
+    (λ (expr)
+      (begin
+        (define shadowed-globals
+          (set-intersect union-vals reg-regs))
+        #;(print union-vals)
+        #;(print reg-regs)
+        #;(print shadowed-globals)
+        (set! reg-regs (set-subtract reg-regs shadowed-globals))
+        (define val
+          ((parse-function-body tail env level) expr))
+        (set! reg-regs (append shadowed-globals reg-regs))
+        val))))
 
 (define parse-function-body
   (lambda (tail env level)
@@ -537,7 +559,7 @@
               (set! main-def (pc2ts-append
                               (pc2ts-append "function format(str: String, ... args: any[]) {\n"
                                             "    var i = 0;\n"
-                                            "    return str.replace(/(~[sav])/g, function (match: Object) {\n"
+                                            "    return str.replace(/(~[savd])/g, function (match: Object) {\n"
                                             "        var argi = args[i];\n"
                                             "        i = i + 1;\n"
                                             "        return JSON.stringify(argi);\n"
@@ -669,4 +691,4 @@
     (let ([pc-file (string-append base-name ".pc")]
           [ts-file (string-append base-name ".ts")])
       (pc2ts pc-file ts-file)
-      (system (string-append "ts-node ./" ts-file)))))
+      (system (string-append "bash --rcfile <(echo \"ts-node " ts-file "\")")))))
