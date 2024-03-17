@@ -102,12 +102,13 @@
                    (loop (cdr l)))]))
         sym)))
 
+; TODO: Remove this
 (define global
   (lambda (sym)
-    (string-append "g_" (safe sym))))
+    (string-append "" (safe sym))))
 
 (define join
-  (lambda (lst separater)
+  (lambda (lst separator)
     (let loop ([lst lst]
                [result ""]
                [is-first? #t])
@@ -118,7 +119,7 @@
         [else (loop (cdr lst)
                     (string-append
                      result
-                     (format "~a~a" separater (car lst)))
+                     (format "~a~a" separator (car lst)))
                     #f)]))))
 
 (define file->list
@@ -276,7 +277,7 @@
                                               "            var " (safe (car var*)) " = " u_obj
                                               "." (safe (lookup-arg name tag n)) ";\n")
                                              (loop (cdr var*) (add1 n)))]))
-                                  ((parse-case-body #t (case-env env var*) 3 var*) body)
+                                  ((parse-function-body #t (case-env env var*) 3) body)
                                   "            break;\n\n"))))]
         ;; Cannot possibly be effective, commented JBH 12/13
         ;; [else (string-append "default {\n"
@@ -323,21 +324,6 @@
     (cond
       [(zero? n) ""]
       [else (string-append "    " (tabs (sub1 n)))])))
-
-(define parse-case-body
-  (λ (tail env level union-vals)
-    (λ (expr)
-      (begin
-        (define shadowed-globals
-          (set-intersect union-vals reg-regs))
-        #;(print union-vals)
-        #;(print reg-regs)
-        #;(print shadowed-globals)
-        (set! reg-regs (set-subtract reg-regs shadowed-globals))
-        (define val
-          ((parse-function-body tail env level) expr))
-        (set! reg-regs (append shadowed-globals reg-regs))
-        val))))
 
 (define parse-function-body
   (lambda (tail env level)
@@ -397,11 +383,9 @@
             [`(set! ,var ,var1) #:when (eq? var var1) ""]
             [`(set! ,var ,val)
              (let ((val ((parse-function-body #f env level) val)))
-               (if (is-global? var)
-                   (begin
-                     (set! current-global-decls (remove-duplicates (cons (global var) current-global-decls)))
-                     (pc2ts-append (tabs level) (global var) " = " (string-trim val) ";\n"))
-                   (pc2ts-append (tabs level) (safe var) " = " (string-trim val) "\n")))]
+               (if (equal? (safe var) reg-pc)
+                   (pc2ts-append (tabs level) (safe var) " = " val ";\n")
+                   (pc2ts-append (tabs level) (safe var) " = " val ";\n")))]
             [`(union-case ,val ,name . ,c*)
              (let ((template* (map car c*))
                    (body* (map get-body c*)))
@@ -413,7 +397,7 @@
                    (error 'union-case "union-case doesn't match definition: `~a'\n"
                           name)
                    (letrec ([sname (safe name)]
-                            [target_u_obj (global val)]
+                            [target_u_obj (safe val)]
                             [cases (apply string-append
                                           (map (handle-union-case-case name env target_u_obj)
                                                template*
@@ -439,7 +423,8 @@
              (string-append (tabs level)
                             "console.log(format("
                                   (join (cons (format "~s" str)
-                                              (map (λ (s)
+                                              (map safe
+                                                   #;(λ (s)
                                                      (cond
                                                        [(is-global? s) (global s)]
                                                        [else (safe s)]))
@@ -447,7 +432,7 @@
                                         ", ") "))\n")]
             [`(mount-trampoline ,construct ,dismount ,pc) 
              (set! construct-var (safe construct))
-             (set! dismount-var (global dismount))
+             (set! dismount-var (safe dismount))
              (pc2ts-append (tabs level)
                            "mount_tram();\n")]
             [`(dismount-trampoline ,dismount)
@@ -466,7 +451,10 @@
             ;;   "fprintf(stderr, \"" msg "\");\n exit(1);\n")]
             [`#t  (pc2ts-append "true")]
             [`#f  (pc2ts-append "false")]
-            [`,x #:when (symbol? x) (letrec ([var (apply-env env x)]
+            
+            [`,x #:when (symbol? x)
+                 (safe (apply-env env x))
+                 #;(letrec ([var (apply-env env x)]
                                              [safe-x (safe var)])
                                       (if (is-global? var)
                                           (begin
@@ -592,7 +580,7 @@
                  "}\n\n")]
             [s4 (pc2ts-append
                  "function jumpout() {\n"
-                 "   " reg-pc " = undefined\n"
+                 "    " reg-pc " = undefined\n"
                  "}")])
         (string-append
          "// Union functions\n"
@@ -633,12 +621,12 @@
             ""
             (string-append
              (join (map (λ (v)
-                          (let ([global-new (global v)])
-                            (set! global-decls (cons global-new global-decls))
+                          (let ([global-new (safe v)])
+                            #;(set! global-decls (cons global-new global-decls))
                             (string-append "var " global-new ": any;"))) reg*) "\n")
              "\nexport {}\n")))]
       [`(define-program-counter ,pc)
-       (set! reg-pc (global pc))
+       (set! reg-pc (safe pc))
        (string-append
         "// Define the program counter\n"
         "var " reg-pc " : Function | undefined = undefined;\n\n")]
@@ -684,4 +672,4 @@
     (let ([pc-file (string-append base-name ".pc")]
           [ts-file (string-append base-name ".ts")])
       (pc2ts pc-file ts-file)
-      (system (string-append "bash --rcfile <(echo \"ts-node " ts-file "\")")))))
+      (system (string-append "ts-node ./" ts-file)))))
