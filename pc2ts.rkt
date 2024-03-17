@@ -303,13 +303,6 @@
       [`((else ,body)) '()]
       [`((,test ,body) . ,c*) `((,test ,body) . ,(remove-last c*))])))
 
-(define env-contains
-  (lambda (env x)
-    (match env
-      [`(empty-env) #f]
-      [`(extend-env ,x^ ,a ,env)
-       (if (eq? x^ x) #t (apply-env env x))])))
-
 (define apply-env
   (lambda (env x)
     (match env
@@ -459,7 +452,7 @@
                            "mount_tram();\n")]
             [`(dismount-trampoline ,dismount)
              (pc2ts-append (tabs level)
-                           "jumpout();\n")]
+                           (safe dismount) "();\n")]
             [`(,func) #:when (is-func? func)
                       (pc2ts-append reg-pc " = " (safe func) ";\n")]
             [`,elsee
@@ -540,10 +533,10 @@
              (let ((x ((parse-function-body #f env level) x)))
                (pc2ts-append "Math.trunc(Math.random() * " x ")"))]
             [`(if ,test ,conseq ,alt) 
-             (let ((test ((parse-function-body #f env) test))
-                   (conseq ((parse-function-body #f env) conseq))
-                   (alt ((parse-function-body #f env) alt)))
-               (pc2ts-append "(" conseq ") ? (" test ") : (" alt ")"))]
+             (let ((test ((parse-function-body #f env level) test))
+                   (conseq ((parse-function-body #f env level) conseq))
+                   (alt ((parse-function-body #f env level) alt)))
+               (pc2ts-append "((" test ") ? (" conseq ") : (" alt "))"))]
             [`(,func . ,args*) #:when (symbol? func)
                                (let ((args* (map (parse-function-body #f env level) args*)))
                                  (pc2ts-append (tabs level)
